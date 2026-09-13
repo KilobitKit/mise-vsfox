@@ -5,80 +5,51 @@
 function PLUGIN:BackendListVersions(ctx)
     local tool = ctx.tool
 
-    -- Validate tool name
-    if not tool or tool == "" then
-        error("Tool name cannot be empty")
+    local qualities = {
+        vscode = "stable",
+        ["vscode-insiders"] = "insider",
+    }
+    local quality = qualities[tool]
+    if not quality then
+        error("vsfox: unsupported tool '" .. tool .. "' (expected vscode or vscode-insiders)")
     end
 
-    -- Example implementations (choose/modify based on your backend):
-
-    -- Example 1: API-based version listing (like npm, pip, cargo)
     local http = require("http")
     local json = require("json")
 
-    -- Replace with your backend's API endpoint
-    local api_url = "https://api.<BACKEND>.org/packages/" .. tool .. "/versions"
-
+    local api_url = "https://update.code.visualstudio.com/api/releases/" .. quality
     local resp, err = http.get({
         url = api_url,
-        -- headers = { ["Authorization"] = "Bearer " .. token } -- if needed
+        headers = { ["User-Agent"] = "mise-vsfox" },
     })
-
     if err then
-        error("Failed to fetch versions for " .. tool .. ": " .. err)
+        error("vsfox: failed to fetch versions for " .. tool .. ": " .. err)
     end
-
     if resp.status_code ~= 200 then
-        error("API returned status " .. resp.status_code .. " for " .. tool)
+        error("vsfox: API returned status " .. resp.status_code .. " for " .. tool)
     end
 
+    -- The update API returns releases newest-first, but BackendListVersions
+    -- must return versions oldest-to-newest, so reverse the array.
+    --
+    -- Insider versions are surfaced WITHOUT the "-insider" suffix: mise flags
+    -- prerelease-looking versions (VERSION_REGEX includes "-insider") for vfox
+    -- backends and filters them out by default, which would also break
+    -- install/use of @latest. The suffix is reapplied at download time.
+    local is_insider = quality == "insider"
     local data = json.decode(resp.body)
     local versions = {}
-
-    -- Parse versions from API response (adjust based on your API structure)
-    if data.versions then
-        for _, version in ipairs(data.versions) do
-            table.insert(versions, version)
+    for i = #data, 1, -1 do
+        local raw = data[i]
+        local version = raw
+        if is_insider then
+            version = raw:gsub("%-insider$", "")
         end
-    end
-
-    -- Example 2: Command-line based version listing
-    --[[
-    local cmd = require("cmd")
-
-    -- Replace with your backend's command to list versions
-    local command = "<BACKEND> search " .. tool .. " --versions"
-    local result = cmd.exec(command)
-
-    if not result or result:match("error") then
-        error("Failed to fetch versions for " .. tool)
-    end
-
-    local versions = {}
-    -- Parse command output to extract versions
-    for version in result:gmatch("[%d%.]+[%w%-]*") do
         table.insert(versions, version)
     end
-    --]]
-
-    -- Example 3: Registry file parsing
-    --[[
-    local file = require("file")
-
-    -- Replace with path to your backend's registry or manifest
-    local registry_path = "/path/to/<BACKEND>/registry/" .. tool .. ".json"
-
-    if not file.exists(registry_path) then
-        error("Tool " .. tool .. " not found in registry")
-    end
-
-    local content = file.read(registry_path)
-    local data = json.decode(content)
-    local versions = data.versions or {}
-    --]]
 
     if #versions == 0 then
-        error("No versions found for " .. tool)
+        error("vsfox: no versions found for " .. tool)
     end
 
     return { versions = versions }

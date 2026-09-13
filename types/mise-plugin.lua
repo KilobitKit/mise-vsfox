@@ -108,8 +108,14 @@ ARCH_TYPE = ""
 ---@field tool string Tool name
 ---@field version string Version to install
 ---@field install_path string Path where the tool should be installed
+---@field download_path? string Optional mise-managed download cache directory
 
 ---@class BackendInstallResult
+
+---@class BackendListToolsCtx
+
+---@class BackendListToolsResult
+---@field tools {name: string, description: string}[] Available tools
 
 ---@class BackendExecEnvCtx
 ---@field tool string Tool name
@@ -131,6 +137,7 @@ ARCH_TYPE = ""
 ---@field BackendListVersions? fun(self: Plugin, ctx: BackendListVersionsCtx): BackendListVersionsResult
 ---@field BackendInstall? fun(self: Plugin, ctx: BackendInstallCtx): BackendInstallResult
 ---@field BackendExecEnv? fun(self: Plugin, ctx: BackendExecEnvCtx): BackendExecEnvResult
+---@field BackendListTools? fun(self: Plugin, ctx: BackendListToolsCtx): BackendListToolsResult
 PLUGIN = {}
 
 ------------------------------------------------------------------------
@@ -167,6 +174,7 @@ local json = {}
 ---@field read fun(path: string): string Read file contents
 ---@field exists fun(path: string): boolean Check if a file exists
 ---@field symlink fun(src: string, dst: string) Create a symbolic link
+---@field glob fun(pattern: string): string[] Match paths by glob pattern
 ---@field join_path fun(...: string): string Join path components
 local file = {}
 
@@ -191,7 +199,7 @@ local env = {}
 -- archiver module ----------------------------------------------------
 
 ---@class archiver
----@field decompress fun(archive: string, dest: string) Decompress an archive (.zip, .tar.gz, .tar.xz, .tar.bz2)
+---@field decompress fun(archive: string, dest: string, opts?: {strip_components?: integer})? Decompress an archive (.zip, .tar.gz, .tar.xz, .tar.bz2)
 local archiver = {}
 
 -- semver module ------------------------------------------------------

@@ -53,7 +53,17 @@ clear "not yet supported" message for unknown OS/arch combinations.
 - Fetch `api/releases/{quality}`, require HTTP 200, decode JSON.
 - The API returns newest-first, but BackendListVersions must return versions
   oldest→newest, so the array is reversed before returning.
-- The `-insider` suffix is the literal version string (matches the download API).
+- **Insider suffix handling (verified against mise source):** mise applies
+  pattern-based prerelease detection to all vfox backend versions
+  (`mark_prereleases_from_version_pattern()` returns true); its `VERSION_REGEX`
+  explicitly matches `-insider`, so every insider version is flagged
+  `prerelease = Some(true)` and dropped by the default
+  `filter_cached_prereleases(.., false)` — which also breaks `@latest`
+  resolution and `mise use`. The hook API only accepts plain version strings
+  (no prerelease/rolling markers). Therefore insider versions are surfaced
+  WITHOUT the `-insider` suffix (valid semver, unfiltered); the suffix is
+  reapplied in `BackendInstall` before the download API call. Literal suffixed
+  versions like `vsfox:vscode-insiders@1.138.0-insider` are still accepted.
 
 ## Installation
 
@@ -65,7 +75,8 @@ clear "not yet supported" message for unknown OS/arch combinations.
 2. Resolve artifact metadata:
    `GET api/versions/{version}/{platform}/{quality}`. HTTP 404 → clear
    "unknown version" error. A defensive `latest` fallback resolves the newest
-   release from `api/releases/{quality}` first.
+   release from `api/releases/{quality}` first. For `vscode-insiders`, a
+   version not already ending in `-insider` has the suffix appended here.
 3. Download to `ctx.download_path` (fall back to `install_path` if absent),
    reusing a pre-existing file (mise download cache) instead of re-downloading.
 4. Verify SHA-256 with `sha256sum` against the API-provided `sha256hash`.

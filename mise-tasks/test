@@ -2,34 +2,38 @@
 #MISE description="Run backend plugin tests - test plugin linking and basic functionality"
 set -euo pipefail
 
+BACKEND=vsfox
+
+# The insider releases endpoint can occasionally exceed mise's default 20s
+# remote-version fetch timeout; raise it for this test run.
+export MISE_FETCH_REMOTE_VERSIONS_TIMEOUT=120
+
 # Link the plugin for testing
-mise plugin link --force <BACKEND> .
+mise plugin link --force ${BACKEND} .
 
 # Clear cache to ensure fresh testing
 mise cache clear
 
-# Test that the plugin can list tools (this should work even if no tools are available)
 echo "Testing plugin linking and basic functionality..."
 
-# Try to list available versions for a test tool
-# Note: This will likely fail until you implement the backend methods
-# Replace <TEST_TOOL> with a real tool name your backend supports
-TEST_TOOL="<TEST_TOOL>"
+# Light CI test: version listing is cheap and hard-asserted for both tools.
+# NOTE: expected vscode -> stable, vscode-insiders -> insider
+for TEST_TOOL in "vscode" "vscode-insiders"; do
+    echo "Testing version listing for ${TEST_TOOL}..."
+    mise ls-remote ${BACKEND}:${TEST_TOOL} > /dev/null
+    echo "✓ Version listing works for ${TEST_TOOL}"
+done
 
-echo "Testing version listing for ${TEST_TOOL}..."
-if mise ls-remote <BACKEND>:${TEST_TOOL} 2>/dev/null; then
-    echo "✓ Version listing works"
-else
-    echo "⚠ Version listing failed - implement backend_list_versions.lua for your backend"
-fi
+# Heavier test: real download + install (~120 MB). Kept tolerant so CI stays
+# fast; run locally to exercise the full download/extract/exec path.
+TEST_TOOL="vscode"
 
-# Test installation if versions are available
 echo "Testing installation..."
-if mise install <BACKEND>:${TEST_TOOL}@latest 2>/dev/null; then
+if mise install ${BACKEND}:${TEST_TOOL}@latest 2>/dev/null; then
     echo "✓ Installation works"
-    
+
     # Test that the tool can be executed
-    if mise exec <BACKEND>:${TEST_TOOL}@latest -- ${TEST_TOOL} --version 2>/dev/null; then
+    if mise exec ${BACKEND}:${TEST_TOOL}@latest -- code --version 2>/dev/null; then
         echo "✓ Tool execution works"
     else
         echo "⚠ Tool execution failed - check backend_exec_env.lua implementation"
@@ -39,4 +43,3 @@ else
 fi
 
 echo "✓ Basic plugin structure tests completed"
-echo "Note: Replace <TEST_TOOL> with a real tool and implement the backend methods"
